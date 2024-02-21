@@ -50,7 +50,7 @@ function main(args)
 
     function ude(u, p, t)
         û = network_u(SA[u[1], u[2], u[3], u[4], u[5], u[6], t], p, st)[1] .* characteristic_ascale  # Scale to datascale
-        du1 = u[1] + û[1] # forcing derivative to be negative but output positive
+        du1 = u[1] + û[1]
         du2 = u[2] + û[2]
         du3 = u[3] + û[3]
         du4 = 0
@@ -73,7 +73,7 @@ function main(args)
     end
 
     function loss_batch(p, batchname)
-        return sum(loss_series.([p], probe_network(p, batchname), data[batchname]["training"])) # now needs kmq (or starq?)
+        return sum(loss_series.([p], probe_network(p, batchname), data[batchname]["training"]))
     end
 
     function loss(p)
@@ -83,7 +83,7 @@ function main(args)
 
     p_load = jldopen(load_path)[name]
 
-    # Plot them!
+    # The plot
     network_data = probe_network(p_load, batchname)
     plt = plot(asteps, network_data[1], label = "Network Hydrogen",
                         title="$(ar["NAME"])", xlabel="Scale Factor", left_margin=5mm);
