@@ -1,1 +1,1 @@
-julia --project=./ ./code/UseScript.jl --INPUT ./code/network_parameters/parameters --DATA ./code/data/TrainingSet.json --WIDTH 30 --OUTPUT ./output --NAME Planck_2018_Best_Fits --PARAMS 0.0457 0.249 2.725
+julia --project=./ ./code/UseScript.jl --INPUT ./code/network_parameters/parameters --DATA ./code/data/TrainingSet.json --WIDTH 30 --NAME Planck_2018_Best_Fits --PARAMS 0.0457 0.249 2.725
