@@ -25,8 +25,8 @@ function main(args)
 
     ar = parse_args(s)
 
-    load_path = ar["INPUT"]
-    data_path = ar["DATA"]
+    load_path = ar["INPUT"][1]
+    data_path = ar["DATA"][1]
     name = "ps"
     width = ar["WIDTH"]
     params = ar["PARAMS"]
@@ -63,33 +63,20 @@ function main(args)
     u = SA[0., 0., 0., 0., 0., 0., 0.] # + H, He, T, a (time)
     ivp = ODEProblem{false}(ude, u, aspan, p);
 
-    function probe_network(p, batchname)
+    function probe_network(p)
         solution = solve(remake(ivp, p=p, u0=SA[1., 1., 1., params[1], params[2], params[3], 0.]), Tsit5(), saveat=asteps, sensealg=QuadratureAdjoint(autojacvec=ZygoteVJP()))
         return [solution[1,:], solution[2,:], solution[3,:]] # xH, xHe, T4
-    end
-
-    function loss_series(p, network, training)
-        return sum(abs, (network .- training))
-    end
-
-    function loss_batch(p, batchname)
-        return sum(loss_series.([p], probe_network(p, batchname), data[batchname]["training"]))
-    end
-
-    function loss(p)
-        batches = keys(data)
-        return sum(map(loss_batch, repeat([p], length(batches)), batches))
     end
 
     p_load = jldopen(load_path)[name]
 
     # The plot
-    network_data = probe_network(p_load, batchname)
+    network_data = probe_network(p_load)
     plt = plot(asteps, network_data[1], label = "Network Hydrogen",
-                        title="$(ar["NAME"])", xlabel="Scale Factor", left_margin=5mm);
+                        title="$(ar["NAME"][1])", xlabel="Scale Factor", left_margin=5mm);
     plot!(plt, asteps, network_data[2], label = "Network Helium");
     plot!(plt, asteps, network_data[3], label = "Network Temperature");
-    savefig("$(ar["NAME"]).png")
+    savefig("$(ar["NAME"][1]).png")
 end
 
 main(ARGS)
