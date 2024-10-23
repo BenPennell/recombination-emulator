@@ -80,7 +80,7 @@ function main(args)
     p_load = jldopen(load_path)[name]
 
     # Make and save the plot
-    network_data = probe_network(p_load, "64")
+    network_data = probe_network(p_load, 64)
     plt = plot(asteps, network_data[1], label = "Network Hydrogen",
                         title="$(ar["NAME"][1])", xlabel="Scale Factor", left_margin=5mm);
     plot!(plt, asteps, network_data[2], label = "Network Helium");
