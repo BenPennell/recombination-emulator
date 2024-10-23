@@ -64,16 +64,10 @@ function main(args)
     u = SA[0., 0., 0., 0., 0., 0., 0.] # + H, He, T, a (time)
     ivp = ODEProblem{false}(ude, u, aspan, p);
 
-    function probe_network_d(p, batchname)
-        params = Float64.(data["test_set"][batchname]["prams"])
-        batchdata = data["test_set"][batchname]["training"]
-
-        network = [[], [], []]
-        for i in 1:1:length(asteps)
-            trial = ude_d(batchdata[1][i], batchdata[2][i], batchdata[3][i], params, p, asteps[i])
-            push!.(network, trial)
-        end
-        return network
+    function probe_network(p, batchname)
+        params = Float64.(data[batchname]["prams"])
+        solution = solve(remake(ivp, p=p, u0=SA[1., 1., 1., params[1], params[2], params[3], 0.]), Tsit5(), saveat=asteps, sensealg=QuadratureAdjoint(autojacvec=ZygoteVJP()))
+        return [solution[1,:], solution[2,:], solution[3,:]] # xH, xHe, T4
     end
 
     # load in the parameters from training
