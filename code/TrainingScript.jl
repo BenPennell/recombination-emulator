@@ -49,6 +49,10 @@ function main(args)
             default = 0.
         "--PRE_TRAIN"
             action = :store_true
+        "--CORE_COUNT"
+            nargs = '?'
+            arg_type = Int
+            default = 1
     end
 
     # ar contains all of the command line parameters
@@ -63,22 +67,19 @@ function main(args)
     catch
     end
 
+    total_iterations = (ar["DECAY"][3] - ar["DECAY"][1]) / ar["DECAY"][2]
     ### DATA
     infile = JSON.parsefile(ar["INPUT"][1]); # He, a, H, T4
     parameters = infile["meta"]["prams"]
-    data = infile["data"]
+    data = infile["data"]["training_set"]
 
     losses = Float64[];
     checkpoint_losses = Float64[];
-
-    start_time = now()
 
     function write_log()
         logfile = open("$(out_folder)/$(ar["NAME"][1])_log.txt", "w")
         write(logfile, """
                 NAME: $(ar["NAME"][1])
-                SOURCE: $(ar["INPUT"][1])
-                TIMESTAMP: $(start_time)
                 SEED: $(ar["SEED"])
                 WIDTH: $(ar["WIDTH"])
                 MAX LEARNING RATE: $(ar["RATE"])
@@ -89,24 +90,26 @@ function main(args)
                 """)
         close(logfile)
     end
-
-    write_log()
     
-    function checkpoint(name, losses)
+    function checkpoint(ps, name, losses)
         jldsave("$(out_folder)/$(ar["NAME"][1])_$(name)_checkpoint"; ps)
         lossfile = open("$(out_folder)/$(ar["NAME"][1])_loss.txt","w")
         write(lossfile, join(losses, "\n"))
         close(lossfile)
     end
 
+    # put the data into a structure that is usable for training
+    # and, normalize the data to improve training
     for batchname in keys(data)
-        data[batchname]["arr"] = [ Float64.(data[batchname][s]) for s in ("xH", "xHe", "T4") ]
+        data[batchname]["arr"] = [ Float64.(data[batchname][s]) for s in ("fh", "fhe", "Tm") ]
         data[batchname]["norm"] = first.(maximum!.([[1.,]], data[batchname]["arr"]));
         data[batchname]["training"] = data[batchname]["arr"] ./ data[batchname]["norm"]
     end
 
+    # create the 'timesteps' for the integrations
     asteps = infile["meta"]["asteps"];
     aspan = (first(asteps), last(asteps));
+
     # for normalization
     characteristic_ascale = 1 / (aspan[2] - aspan[1])
 
@@ -142,7 +145,7 @@ function main(args)
         return [solution[1,:], solution[2,:], solution[3,:]] # xH, xHe, T4
     end
 
-
+    ######################################
     ##---------- PRE-TRAINING ----------##
     function slope(batch, i)
         if i == length(asteps)
@@ -182,12 +185,14 @@ function main(args)
     end
 
     function loss_d(p)
-        batches = keys(data)
+        batches = rand(keys(data), ar["CORE_COUNT"][1]) # choose batches equal to core count, which also minibatches the data
         return sum(tmap(loss_batch_d, repeat([p], length(batches)), batches))
     end
     ##---------- PRE-TRAINING ----------##
+    ######################################
 
-    ### LOSS
+    ######################################
+    ##-------------- LOSS --------------##
     function loss_series(p, network, training)
         return sum(abs, (network .- training))
     end
@@ -197,9 +202,11 @@ function main(args)
     end
 
     function loss(p)
-        batches = keys(data)
+        batches = rand(keys(data), ar["CORE_COUNT"][1]) # choose batches equal to core count, which also minibatches the data
         return sum(tmap(loss_batch, repeat([p], length(batches)), batches)) + ar["WEIGHT_DECAY"] * sum(abs2, p) # weight decay. ar["WEIGHT_DECAY"] is defaulted to 0
     end
+    ##-------------- LOSS --------------##
+    ######################################
 
     ### LEARNING RATE SCHEDULE
     decay(x) = cos(x % π/2) # Only get first quadrant
@@ -221,6 +228,7 @@ function main(args)
         ps = result.u
 
         record_loss = losses[1]
+        # First, pretrain on naive slope
         if ar["PRE_TRAIN"]            
             for batchname in keys(data)
                 data[batchname]["derivatives"] = [[], [], []]
@@ -237,9 +245,10 @@ function main(args)
             push!(checkpoint_losses, record_loss)
             ps = result.u
 
-            checkpoint("Pre-training", losses)
+            checkpoint(ps, "Pre-training", losses)
             write_log()
         end
+        # Then, stochastic gradient descent
         if ar["ADAM"]
             for rate in rates
                 optprob = Optimization.OptimizationProblem(optf, ps)
@@ -249,10 +258,11 @@ function main(args)
                 push!(checkpoint_losses, record_loss)
                 ps = result.u
 
-                checkpoint("$(length(losses))", losses)
+                checkpoint(ps, "$(length(losses))", losses)
                 write_log()
             end
         end
+        # Finally, converge on better solution with BFGS
         if ar["BFGS"]
             for rate in (rates[1]*10, rates[1]*3, rates[1], rates[1]/3, rates[1]/10)
                 optprob = Optimization.OptimizationProblem(optf, ps)
@@ -265,17 +275,17 @@ function main(args)
                 push!(checkpoint_losses, record_loss)
                 ps = result.u
 
-                checkpoint("BFGS$(rate)", losses)
+                checkpoint(ps, "BFGS$(rate)", losses)
                 write_log()
             end
         end
 
-        checkpoint("FinalNetworkParameters", losses)
+        checkpoint(ps, "FinalNetworkParameters", losses)
     end
 
     p = ComponentVector{Float64}(p)
 
-    # Choice to load in partly trained network
+    # Choice to load in parameters to start from
     if ar["LOAD"]
         p = jldopen(ar["LOAD_PATH"][1])["ps"]
     else

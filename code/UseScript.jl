@@ -39,7 +39,7 @@ function main(args)
     aspan = (first(asteps), last(asteps));
     characteristic_ascale = 1 / (aspan[2] - aspan[1])
 
-    ### NETWORK
+    ### CREATE THE NETWORK
     network_u = Lux.Chain(Lux.Dense(7, width, tanh), # + H, He, T, a
                             Lux.Dense(width, width, tanh), 
                             Lux.Dense(width, width, tanh), 
@@ -48,6 +48,7 @@ function main(args)
 
     p, st = Lux.setup(rng, network_u);
 
+    ### FUNCTION TO PROBE THE NETWORK
     function ude(u, p, t)
         û = network_u(SA[u[1], u[2], u[3], u[4], u[5], u[6], t], p, st)[1] .* characteristic_ascale  # Scale to datascale
         du1 = u[1] + û[1]
@@ -68,9 +69,10 @@ function main(args)
         return [solution[1,:], solution[2,:], solution[3,:]] # xH, xHe, T4
     end
 
+    # load in the parameters from training
     p_load = jldopen(load_path)[name]
 
-    # The plot
+    # Make and save the plot
     network_data = probe_network(p_load)
     plt = plot(asteps, network_data[1], label = "Network Hydrogen",
                         title="$(ar["NAME"][1])", xlabel="Scale Factor", left_margin=5mm);

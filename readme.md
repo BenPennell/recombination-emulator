@@ -43,3 +43,6 @@ $ ]
 `\code\UseScript.jl` takes in the values of the variable parameters and plots the corresponding network output from the network with a given set of network parameters
 
 `\code\UseExample.jl` contains an exmaple for running the use script from the command line, which plots the result of putting the Planck 2018 best fits through the exact network used for the results in the paper
+
+## Data
+`\code\data\Data.json` contains the training data, created from hyrec, that was used in the training of this network. It is a dictionary that contains `training_set` of 48 sample ionization histories, and a `test_set` with 17 additional ionization histories
